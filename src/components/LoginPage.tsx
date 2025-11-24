@@ -5,21 +5,80 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Users, Truck, TrendingDown, Clock, Shield } from 'lucide-react';
+import { Users, Truck, TrendingDown, Clock, Shield, AlertCircle } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { Alert, AlertDescription } from './ui/alert';
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { login } = useAuth();
+  const [activeTab, setActiveTab] = useState('admin');
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleAdminLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    navigate('/dashboard');
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (error) setError('');
   };
 
-  const handleDriverLogin = (e: React.FormEvent) => {
+  const getDefaultCredentials = () => {
+    switch (activeTab) {
+      case 'admin':
+        return { email: 'admin@optiroute.com', password: 'admin123' };
+      case 'driver':
+        return { email: 'driver@optiroute.com', password: 'driver123' };
+      case 'employee':
+        return { email: 'empleado@optiroute.com', password: 'employee123' };
+      default:
+        return { email: '', password: '' };
+    }
+  };
+
+  const fillDefaultCredentials = () => {
+    const credentials = getDefaultCredentials();
+    setFormData(credentials);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate('/conductor');
+    if (!formData.email || !formData.password) {
+      setError('Por favor completa todos los campos');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await login(formData.email, formData.password);
+      
+      if (response.success) {
+        const userRole = response.user.role;
+        
+        // Redirect based on user role
+        switch (userRole) {
+          case 'admin':
+            navigate('/dashboard');
+            break;
+          case 'driver':
+            navigate('/conductor');
+            break;
+          case 'employee':
+            navigate('/empleado');
+            break;
+          default:
+            navigate('/dashboard');
+        }
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error de autenticación');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -108,8 +167,8 @@ export function LoginPage() {
               <CardDescription>Selecciona tu tipo de usuario</CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="admin" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="admin">
                     <Shield className="w-4 h-4 mr-2" />
                     Admin
@@ -118,63 +177,74 @@ export function LoginPage() {
                     <Truck className="w-4 h-4 mr-2" />
                     Conductor
                   </TabsTrigger>
+                  <TabsTrigger value="employee">
+                    <Users className="w-4 h-4 mr-2" />
+                    Empleado
+                  </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="admin">
-                  <form onSubmit={handleAdminLogin} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="admin-email">Correo electrónico</Label>
-                      <Input
-                        id="admin-email"
-                        type="email"
-                        placeholder="admin@empresa.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="admin-password">Contraseña</Label>
-                      <Input
-                        id="admin-password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <Button type="submit" className="w-full bg-blue-700 hover:bg-blue-800">
-                      Acceder al Dashboard
-                    </Button>
-                  </form>
-                </TabsContent>
+                <div className="mt-4">
+                  {error && (
+                    <Alert className="mb-4 border-red-200 bg-red-50">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                      <AlertDescription className="text-red-800">
+                        {error}
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
-                <TabsContent value="driver">
-                  <form onSubmit={handleDriverLogin} className="space-y-4">
+                  <form onSubmit={handleSubmit} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="driver-email">Correo electrónico</Label>
+                      <Label htmlFor="email">Correo electrónico</Label>
                       <Input
-                        id="driver-email"
+                        id="email"
                         type="email"
-                        placeholder="conductor@empresa.com"
+                        placeholder={getDefaultCredentials().email}
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
                         required
+                        disabled={loading}
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="driver-password">Contraseña</Label>
+                      <Label htmlFor="password">Contraseña</Label>
                       <Input
-                        id="driver-password"
+                        id="password"
                         type="password"
                         placeholder="••••••••"
+                        value={formData.password}
+                        onChange={(e) => handleInputChange('password', e.target.value)}
                         required
+                        disabled={loading}
                       />
                     </div>
-                    <Button type="submit" className="w-full bg-orange-600 hover:bg-orange-700">
-                      Ver mis rutas
+
+                    {/* Demo credentials helper */}
+                    <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
+                      <p className="font-medium mb-1">Credenciales de demo:</p>
+                      <p>Email: {getDefaultCredentials().email}</p>
+                      <p>Password: {getDefaultCredentials().password}</p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 w-full"
+                        onClick={fillDefaultCredentials}
+                        disabled={loading}
+                      >
+                        Usar credenciales de demo
+                      </Button>
+                    </div>
+
+                    <Button 
+                      type="submit" 
+                      className="w-full" 
+                      disabled={loading}
+                    >
+                      {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
                     </Button>
                   </form>
-                </TabsContent>
+                </div>
               </Tabs>
             </CardContent>
           </Card>

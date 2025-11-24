@@ -4,6 +4,8 @@ import { DashboardLayout } from './components/DashboardLayout';
 import { AdminDashboard } from './components/AdminDashboard';
 import { EmployeesPage } from './components/EmployeesPage';
 import { VehiclesPage } from './components/VehiclesPage';
+import { RoutesPage } from './components/RoutesPage';
+import LocationsPage from './components/LocationsPage';
 import { PlanRoutePage } from './components/PlanRoutePage';
 import { GeneratedRoutePage } from './components/GeneratedRoutePage';
 import { DriverView } from './components/DriverView';
@@ -18,8 +20,11 @@ export default function App() {
           <Route index element={<AdminDashboard />} />
           <Route path="empleados" element={<EmployeesPage />} />
           <Route path="vehiculos" element={<VehiclesPage />} />
+          <Route path="rutas" element={<RoutesPage />} />
+          <Route path="ubicaciones" element={<LocationsPage />} />
           <Route path="planificar-ruta" element={<PlanRoutePage />} />
           <Route path="ruta-generada" element={<GeneratedRoutePage />} />
+          <Route path="ruta-generada/:routeId" element={<GeneratedRoutePage />} />
         </Route>
         <Route path="/conductor" element={<DriverView />} />
         <Route path="/empleado" element={<EmployeeView />} />

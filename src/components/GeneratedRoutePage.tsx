@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
+import { Alert, AlertDescription } from './ui/alert';
 import { 
   MapPin, 
   Navigation, 
@@ -12,94 +15,133 @@ import {
   Send,
   ArrowRight,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  RefreshCw,
+  AlertCircle,
+  ArrowLeft
 } from 'lucide-react';
-
-const routeData = {
-  id: 'RT-005',
-  date: '22/10/2024',
-  shift: 'Matutino',
-  destination: 'Sede Norte',
-  vehicle: 'Bus Mercedes 001',
-  driver: 'Roberto Sánchez',
-  totalDistance: '45.2 km',
-  estimatedDuration: '1h 25min',
-  departureTime: '07:00 AM',
-  arrivalTime: '08:25 AM',
-  stops: [
-    {
-      order: 1,
-      employee: 'Juan Pérez',
-      address: 'Calle 72 #54-46, Barranquilla',
-      coordinates: [10.9878, -74.7889] as [number, number],
-      eta: '07:15 AM',
-      distance: '8.5 km',
-      status: 'pending'
-    },
-    {
-      order: 2,
-      employee: 'María García',
-      address: 'Carrera 51B #84-24, Barranquilla',
-      coordinates: [11.0041, -74.8070] as [number, number],
-      eta: '07:28 AM',
-      distance: '5.2 km',
-      status: 'pending'
-    },
-    {
-      order: 3,
-      employee: 'Carlos Rodríguez',
-      address: 'Calle 93 #47-42, Barranquilla',
-      coordinates: [11.0180, -74.8051] as [number, number],
-      eta: '07:42 AM',
-      distance: '6.8 km',
-      status: 'pending'
-    },
-    {
-      order: 4,
-      employee: 'Luis Fernández',
-      address: 'Carrera 46 #76-135, Barranquilla',
-      coordinates: [10.9635, -74.7964] as [number, number],
-      eta: '07:55 AM',
-      distance: '7.3 km',
-      status: 'pending'
-    },
-    {
-      order: 5,
-      employee: 'Sofia López',
-      address: 'Calle 79B #57-52, Barranquilla',
-      coordinates: [10.9942, -74.7853] as [number, number],
-      eta: '08:10 AM',
-      distance: '9.1 km',
-      status: 'pending'
-    },
-  ],
-  finalDestination: {
-    name: 'Sede Norte',
-    address: 'Calle 85 #42-32, Barranquilla',
-    coordinates: [10.9983, -74.7892] as [number, number],
-    eta: '08:25 AM',
-    distance: '8.3 km'
-  }
-};
+import { useApi } from '../hooks/useApi';
+import routeService, { Route } from '../services/route';
+import { formatters } from '../services/utils';
 
 export function GeneratedRoutePage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { routeId } = useParams();
+  
+  // Get route from navigation state or fetch by ID
+  const [routeData, setRouteData] = useState<Route | null>(location.state?.route || null);
+  
+  const {
+    data: fetchedRoute,
+    loading: routeLoading,
+    error: routeError,
+    refetch: refetchRoute
+  } = useApi(
+    () => routeId ? routeService.getById(parseInt(routeId)) : Promise.resolve(null),
+    [routeId]
+  );
+
+  useEffect(() => {
+    if (fetchedRoute && !routeData) {
+      setRouteData(fetchedRoute);
+    }
+  }, [fetchedRoute, routeData]);
+
+  // If no route data and no routeId, redirect back
+  useEffect(() => {
+    if (!routeData && !routeId && !routeLoading) {
+      navigate('/dashboard/rutas');
+    }
+  }, [routeData, routeId, routeLoading, navigate]);
+
   const openInGoogleMaps = () => {
-    const addresses = [
-      ...routeData.stops.map(s => s.address),
-      routeData.finalDestination.address
-    ];
-    const destination = encodeURIComponent(routeData.finalDestination.address);
-    const waypoints = addresses.slice(0, -1).map(a => encodeURIComponent(a)).join('|');
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&waypoints=${waypoints}`;
-    window.open(url, '_blank');
+    // Priorizar stops si están disponibles, sino usar assignments como respaldo
+    if (routeData?.stops?.length && routeData.stops.length > 0) {
+      // Usar datos de stops (ubicaciones configurables)
+      const orderedStops = [...routeData.stops].sort((a, b) => a.order - b.order);
+      
+      const firstStop = orderedStops[0];
+      const origin = encodeURIComponent(`${firstStop.latitude},${firstStop.longitude}`);
+      
+      const lastStop = orderedStops[orderedStops.length - 1];
+      const destination = encodeURIComponent(`${lastStop.latitude},${lastStop.longitude}`);
+      
+      const waypoints = orderedStops
+        .slice(1, -1)
+        .map(stop => encodeURIComponent(`${stop.latitude},${stop.longitude}`))
+        .join('|');
+      
+      let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+      if (waypoints) {
+        url += `&waypoints=${waypoints}`;
+      }
+      
+      window.open(url, '_blank');
+    } else if (routeData?.assignments?.length && routeData.assignments.length > 0) {
+      // Respaldo: usar assignments (método anterior)
+      const addresses = routeData.assignments.map(assignment => assignment.employee.address);
+      const destination = encodeURIComponent(routeData.homeBase || 'Sede Principal');
+      const waypoints = addresses.map(a => encodeURIComponent(a)).join('|');
+      const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&waypoints=${waypoints}`;
+      window.open(url, '_blank');
+    } else {
+      alert('No hay datos de ruta disponibles para mostrar en Google Maps');
+    }
   };
+
+  if (routeLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+        <span className="ml-2 text-lg">Cargando ruta...</span>
+      </div>
+    );
+  }
+
+  if (routeError || (!routeData && !routeLoading)) {
+    return (
+      <div className="p-6">
+        <Alert className="border-red-200 bg-red-50">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">
+            {routeError || 'No se pudo cargar la información de la ruta'}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="ml-4" 
+              onClick={() => routeId ? refetchRoute() : navigate('/dashboard/rutas')}
+            >
+              {routeId ? 'Reintentar' : 'Volver a Rutas'}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (!routeData) {
+    return null;
+  }
 
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-gray-900 mb-2">Ruta Generada - {routeData.id}</h1>
-          <p className="text-gray-600">Ruta optimizada lista para ser asignada</p>
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => navigate('/dashboard/rutas')}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Volver a Rutas
+          </Button>
+          <div>
+            <h1 className="text-gray-900 mb-2">
+              Ruta Generada - RT-{routeData.id.toString().padStart(3, '0')}
+            </h1>
+            <p className="text-gray-600">Ruta optimizada lista para ser asignada</p>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline">
@@ -127,7 +169,7 @@ export function GeneratedRoutePage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Distancia Total</p>
-                <p className="text-xl text-gray-900">{routeData.totalDistance}</p>
+                <p className="text-xl text-gray-900">{formatters.distance(routeData.totalDistance)}</p>
               </div>
             </div>
           </CardContent>
@@ -140,7 +182,7 @@ export function GeneratedRoutePage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Duración Est.</p>
-                <p className="text-xl text-gray-900">{routeData.estimatedDuration}</p>
+                <p className="text-xl text-gray-900">{formatters.duration(routeData.estimatedDuration)}</p>
               </div>
             </div>
           </CardContent>
@@ -153,7 +195,7 @@ export function GeneratedRoutePage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Pasajeros</p>
-                <p className="text-xl text-gray-900">{routeData.stops.length}</p>
+                <p className="text-xl text-gray-900">{routeData.assignments?.length || 0}</p>
               </div>
             </div>
           </CardContent>
@@ -166,12 +208,81 @@ export function GeneratedRoutePage() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Paradas</p>
-                <p className="text-xl text-gray-900">{routeData.stops.length + 1}</p>
+                <p className="text-xl text-gray-900">{routeData.stops?.length || 0}</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Route Endpoints Information */}
+      {routeData.stops && routeData.stops.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {(() => {
+            const sortedStops = [...routeData.stops].sort((a, b) => a.order - b.order);
+            const startStop = sortedStops.find(stop => stop.order === 0);
+            const endStop = sortedStops.find(stop => stop.type === 'destination');
+            
+            return (
+              <>
+                {/* Start Location */}
+                {startStop && (
+                  <Card className="border-blue-200 bg-blue-50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-blue-700">
+                        <Navigation className="w-5 h-5" />
+                        Punto de Inicio
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2">
+                        <h3 className="font-medium text-gray-900">{startStop.name}</h3>
+                        <p className="text-sm text-gray-600 flex items-start gap-2">
+                          <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                          {startStop.address}
+                        </p>
+                        {startStop.estimatedArrival && (
+                          <p className="text-sm text-blue-600 flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            Salida: {formatters.time(startStop.estimatedArrival)}
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {/* End Location */}
+                {endStop && (
+                  <Card className="border-green-200 bg-green-50">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="flex items-center gap-2 text-green-700">
+                        <CheckCircle2 className="w-5 h-5" />
+                        Destino Final
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-2">
+                        <h3 className="font-medium text-gray-900">{endStop.name}</h3>
+                        <p className="text-sm text-gray-600 flex items-start gap-2">
+                          <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                          {endStop.address}
+                        </p>
+                        {endStop.estimatedArrival && (
+                          <p className="text-sm text-green-600 flex items-center gap-2">
+                            <Clock className="w-4 h-4" />
+                            Llegada estimada: {formatters.time(endStop.estimatedArrival)}
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Map Visualization */}
@@ -184,42 +295,74 @@ export function GeneratedRoutePage() {
               {/* Route visualization */}
               <div className="absolute inset-0 flex items-center justify-center p-8">
                 <div className="relative w-full h-full flex flex-col justify-between">
-                  {/* Start */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-blue-700 text-white flex items-center justify-center shadow-lg flex-shrink-0 z-10">
-                      <span>S</span>
-                    </div>
-                    <div className="bg-white rounded-lg p-3 shadow-md flex-1">
-                      <p className="text-sm text-gray-900">{routeData.stops[0].employee}</p>
-                      <p className="text-xs text-gray-600">{routeData.stops[0].address}</p>
-                    </div>
-                  </div>
-
-                  {/* Middle stops */}
-                  <div className="flex-1 flex flex-col justify-around py-4 border-l-4 border-dashed border-blue-300 ml-6">
-                    {routeData.stops.slice(1).map((stop) => (
-                      <div key={stop.order} className="flex items-center gap-4 -ml-6">
-                        <div className="w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center shadow-lg flex-shrink-0 z-10">
-                          {stop.order}
+                  {/* Show all assignments as stops */}
+                  {routeData.assignments && routeData.assignments.length > 0 ? (
+                    <>
+                      {/* First employee */}
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-blue-700 text-white flex items-center justify-center shadow-lg flex-shrink-0 z-10">
+                          <span>1</span>
                         </div>
-                        <div className="bg-white rounded-lg p-2 shadow-md flex-1">
-                          <p className="text-sm text-gray-900">{stop.employee}</p>
-                          <p className="text-xs text-gray-600">{stop.address.substring(0, 30)}...</p>
+                        <div className="bg-white rounded-lg p-3 shadow-md flex-1">
+                          <p className="text-sm text-gray-900">
+                            {formatters.getFullName(routeData.assignments[0].employee.firstName, routeData.assignments[0].employee.lastName)}
+                          </p>
+                          <p className="text-xs text-gray-600">{routeData.assignments[0].employee.address}</p>
                         </div>
                       </div>
-                    ))}
-                  </div>
 
-                  {/* End */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-green-600 text-white flex items-center justify-center shadow-lg flex-shrink-0 z-10">
-                      <MapPin className="w-6 h-6" />
+                      {/* Middle employees */}
+                      {routeData.assignments.length > 2 && (
+                        <div className="flex-1 flex flex-col justify-around py-4 border-l-4 border-dashed border-blue-300 ml-6">
+                          {routeData.assignments.slice(1, -1).map((assignment, index) => (
+                            <div key={assignment.id} className="flex items-center gap-4 -ml-6">
+                              <div className="w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center shadow-lg flex-shrink-0 z-10">
+                                {index + 2}
+                              </div>
+                              <div className="bg-white rounded-lg p-2 shadow-md flex-1">
+                                <p className="text-sm text-gray-900">
+                                  {formatters.getFullName(assignment.employee.firstName, assignment.employee.lastName)}
+                                </p>
+                                <p className="text-xs text-gray-600">
+                                  {assignment.employee.address.length > 30 ? 
+                                    `${assignment.employee.address.substring(0, 30)}...` : 
+                                    assignment.employee.address
+                                  }
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Last employee (if more than one) */}
+                      {routeData.assignments.length > 1 && (
+                        <div className="flex items-center gap-4">
+                          <div className="w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center shadow-lg flex-shrink-0 z-10">
+                            {routeData.assignments.length}
+                          </div>
+                          <div className="bg-white rounded-lg p-2 shadow-md flex-1">
+                            <p className="text-sm text-gray-900">
+                              {formatters.getFullName(
+                                routeData.assignments[routeData.assignments.length - 1].employee.firstName, 
+                                routeData.assignments[routeData.assignments.length - 1].employee.lastName
+                              )}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              {routeData.assignments[routeData.assignments.length - 1].employee.address}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center text-gray-500">
+                        <MapPin className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <p>No hay empleados asignados</p>
+                      </div>
                     </div>
-                    <div className="bg-white rounded-lg p-3 shadow-md flex-1">
-                      <p className="text-sm text-gray-900">{routeData.finalDestination.name}</p>
-                      <p className="text-xs text-gray-600">{routeData.finalDestination.address}</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -254,39 +397,55 @@ export function GeneratedRoutePage() {
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm text-gray-600 mb-1">Fecha</p>
-              <p className="text-gray-900">{routeData.date}</p>
+              <p className="text-gray-900">{formatters.date(routeData.date)}</p>
             </div>
             <Separator />
             <div>
               <p className="text-sm text-gray-600 mb-1">Turno</p>
-              <p className="text-gray-900">{routeData.shift}</p>
+              <p className="text-gray-900">{formatters.shift(routeData.shift)}</p>
             </div>
             <Separator />
             <div>
               <p className="text-sm text-gray-600 mb-1">Destino</p>
-              <p className="text-gray-900">{routeData.destination}</p>
+              <p className="text-gray-900">{routeData.homeBase || 'Sede Principal'}</p>
             </div>
             <Separator />
             <div>
               <p className="text-sm text-gray-600 mb-1">Vehículo</p>
-              <p className="text-gray-900">{routeData.vehicle}</p>
+              <p className="text-gray-900">
+                {routeData.vehicle?.model || 'No asignado'} 
+                {routeData.vehicle?.licensePlate && ` - ${routeData.vehicle.licensePlate}`}
+              </p>
             </div>
             <Separator />
             <div>
-              <p className="text-sm text-gray-600 mb-1">Conductor</p>
-              <p className="text-gray-900">{routeData.driver}</p>
+              <p className="text-sm text-gray-600 mb-1">Estado</p>
+              <Badge className={
+                routeData.status === 'completed' ? 'bg-green-100 text-green-800' :
+                routeData.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                routeData.status === 'planned' ? 'bg-blue-100 text-blue-800' :
+                'bg-gray-100 text-gray-800'
+              }>
+                {formatters.routeStatus(routeData.status)}
+              </Badge>
             </div>
             <Separator />
             <div>
               <p className="text-sm text-gray-600 mb-1">Horario</p>
-              <div className="flex items-center gap-2">
-                <Badge className="bg-blue-100 text-blue-800">
-                  Salida: {routeData.departureTime}
-                </Badge>
-                <ArrowRight className="w-4 h-4 text-gray-400" />
-                <Badge className="bg-green-100 text-green-800">
-                  Llegada: {routeData.arrivalTime}
-                </Badge>
+              <div className="flex items-center gap-2 flex-wrap">
+                {routeData.startTime && (
+                  <Badge className="bg-blue-100 text-blue-800">
+                    Inicio: {formatters.time(routeData.startTime)}
+                  </Badge>
+                )}
+                {routeData.startTime && routeData.estimatedDuration && (
+                  <>
+                    <ArrowRight className="w-4 h-4 text-gray-400" />
+                    <Badge className="bg-green-100 text-green-800">
+                      Estimado: {formatters.duration(routeData.estimatedDuration)}
+                    </Badge>
+                  </>
+                )}
               </div>
             </div>
           </CardContent>
@@ -300,61 +459,173 @@ export function GeneratedRoutePage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-1">
-            {/* Start */}
-            <div className="flex items-start gap-4 p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
-              <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center flex-shrink-0 mt-1">
-                <span>S</span>
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-gray-900">Inicio del recorrido</p>
-                  <Badge className="bg-blue-700 text-white">{routeData.departureTime}</Badge>
-                </div>
-                <p className="text-sm text-gray-600">{routeData.stops[0].address}</p>
-              </div>
-            </div>
+            {/* Priorizar stops, sino usar assignments como respaldo */}
+            {routeData.stops && routeData.stops.length > 0 ? (
+              // Mostrar usando datos de stops (ubicaciones configurables)
+              <>
+                {[...routeData.stops]
+                  .sort((a, b) => a.order - b.order)
+                  .map((stop, index) => {
+                    const isStart = stop.type === 'waypoint' && stop.order === 0;
+                    const isDestination = stop.type === 'destination';
+                    const isPickup = stop.type === 'pickup';
+                    
+                    // Encontrar el empleado correspondiente para paradas de recogida
+                    const assignment = routeData.assignments?.find(
+                      (a: any) => a.employee.address === stop.address || 
+                           (stop.name && stop.name.includes(a.employee.firstName))
+                    );
 
-            {/* Stops */}
-            {routeData.stops.map((stop) => (
-              <div key={stop.order} className="flex items-start gap-4 p-4 bg-white rounded-lg border hover:bg-gray-50 transition-colors">
-                <div className="w-8 h-8 rounded-full bg-orange-600 text-white flex items-center justify-center flex-shrink-0 mt-1">
-                  {stop.order}
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-gray-900">{stop.employee}</p>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">{stop.distance}</Badge>
-                      <Badge className="bg-orange-100 text-orange-800">{stop.eta}</Badge>
+                    return (
+                      <div 
+                        key={stop.id} 
+                        className={`flex items-start gap-4 p-4 rounded-lg border transition-colors ${
+                          isStart ? 'bg-blue-50 border-2 border-blue-200' :
+                          isDestination ? 'bg-green-50 border-2 border-green-200' :
+                          'bg-white border hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-full text-white flex items-center justify-center flex-shrink-0 mt-1 ${
+                          isStart ? 'bg-blue-600' :
+                          isDestination ? 'bg-green-600' :
+                          'bg-blue-600'
+                        }`}>
+                          {isStart ? (
+                            <Navigation className="w-5 h-5" />
+                          ) : isDestination ? (
+                            <CheckCircle2 className="w-5 h-5" />
+                          ) : (
+                            stop.order
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="text-gray-900 font-medium">
+                              {isStart ? `🚗 ${stop.name}` :
+                               isDestination ? `🏢 ${stop.name}` :
+                               isPickup && assignment ? 
+                                 `👤 Recogida - ${formatters.getFullName(assignment.employee.firstName, assignment.employee.lastName)}` :
+                                 stop.name}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              {stop.estimatedArrival && (
+                                <Badge className={`${
+                                  isStart ? 'bg-blue-700 text-white' :
+                                  isDestination ? 'bg-green-700 text-white' :
+                                  'bg-blue-100 text-blue-800'
+                                }`}>
+                                  {formatters.time(stop.estimatedArrival)}
+                                </Badge>
+                              )}
+                              <Badge className={`${
+                                isStart ? 'bg-blue-200 text-blue-800' :
+                                isDestination ? 'bg-green-200 text-green-800' :
+                                'bg-gray-200 text-gray-800'
+                              }`}>
+                                {isStart ? 'Punto de Inicio' :
+                                 isDestination ? 'Destino Final' :
+                                 'Recogida'}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2 text-sm text-gray-600">
+                            <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                            <span>{stop.address}</span>
+                          </div>
+                          
+                          {/* Información adicional para empleados */}
+                          {isPickup && assignment?.employee.department && (
+                            <div className="mt-2">
+                              <Badge variant="outline" className="text-xs">
+                                {assignment.employee.department}
+                              </Badge>
+                            </div>
+                          )}
+                          
+                          {/* Información de distancia y duración */}
+                          {stop.distanceFromPrevious > 0 && stop.order > 0 && (
+                            <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <Navigation className="w-3 h-3" />
+                                {(stop.distanceFromPrevious / 1000).toFixed(1)} km
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                {Math.round(stop.durationFromPrevious / 60)} min
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </>
+            ) : routeData.assignments && routeData.assignments.length > 0 ? (
+              // Respaldo: mostrar usando assignments (método anterior)
+              <>
+                {routeData.assignments.map((assignment: any, index: number) => (
+                  <div 
+                    key={assignment.id} 
+                    className="flex items-start gap-4 p-4 bg-white rounded-lg border hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center flex-shrink-0 mt-1">
+                      {assignment.pickupOrder || index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-gray-900">
+                          {formatters.getFullName(assignment.employee.firstName, assignment.employee.lastName)}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          {assignment.estimatedPickupTime && (
+                            <Badge className="bg-blue-100 text-blue-800">
+                              {formatters.time(assignment.estimatedPickupTime)}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2 text-sm text-gray-600">
+                        <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                        <span>{assignment.employee.address}</span>
+                      </div>
+                      {assignment.employee.department && (
+                        <div className="mt-2">
+                          <Badge variant="outline" className="text-xs">
+                            {assignment.employee.department}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-start gap-2 text-sm text-gray-600">
-                    <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <span>{stop.address}</span>
+                ))}
+                
+                {/* Final Destination */}
+                <div className="flex items-start gap-4 p-4 bg-green-50 rounded-lg border-2 border-green-200">
+                  <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center flex-shrink-0 mt-1">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-gray-900">{routeData.homeBase || 'Sede Principal'}</p>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-green-700 text-white">
+                          Destino Final
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-2 text-sm text-gray-600">
+                      <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>Punto de destino de todos los empleados</span>
+                    </div>
                   </div>
                 </div>
+              </>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <MapPin className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No hay datos de ruta disponibles</p>
               </div>
-            ))}
-
-            {/* Final Destination */}
-            <div className="flex items-start gap-4 p-4 bg-green-50 rounded-lg border-2 border-green-200">
-              <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center flex-shrink-0 mt-1">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-gray-900">{routeData.finalDestination.name}</p>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{routeData.finalDestination.distance}</Badge>
-                    <Badge className="bg-green-700 text-white">{routeData.finalDestination.eta}</Badge>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2 text-sm text-gray-600">
-                  <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>{routeData.finalDestination.address}</span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </CardContent>
       </Card>

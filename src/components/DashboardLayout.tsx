@@ -4,6 +4,7 @@ import {
   Users, 
   Truck, 
   Route, 
+  MapPin,
   Settings, 
   Menu,
   LogOut
@@ -19,6 +20,8 @@ export function DashboardLayout() {
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/dashboard/empleados', icon: Users, label: 'Empleados' },
     { path: '/dashboard/vehiculos', icon: Truck, label: 'Vehículos' },
+    { path: '/dashboard/rutas', icon: Route, label: 'Rutas' },
+    { path: '/dashboard/ubicaciones', icon: MapPin, label: 'Ubicaciones' },
     { path: '/dashboard/planificar-ruta', icon: Route, label: 'Planificar Ruta' },
   ];
 

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -8,35 +9,99 @@ import {
   TrendingUp,
   Calendar,
   MapPin,
-  Clock
+  Clock,
+  DollarSign,
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useApi } from '../hooks/useApi';
+import dashboardService, { DashboardStats } from '../services/dashboard';
+import { formatters } from '../services/utils';
+import { Alert, AlertDescription } from './ui/alert';
 
 export function AdminDashboard() {
-  const stats = [
+  const {
+    data: stats,
+    loading: statsLoading,
+    error: statsError,
+    refetch: refetchStats
+  } = useApi(() => dashboardService.getStats());
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'planned': return 'bg-blue-100 text-blue-800';
+      case 'in_progress': return 'bg-yellow-100 text-yellow-800';
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (statsLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
+        <span className="ml-2 text-lg">Cargando dashboard...</span>
+      </div>
+    );
+  }
+
+  if (statsError) {
+    return (
+      <div className="p-6">
+        <Alert className="border-red-200 bg-red-50">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">
+            Error al cargar el dashboard: {statsError}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="ml-4" 
+              onClick={() => refetchStats()}
+            >
+              Reintentar
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (!stats) return null;
+
+  const overviewCards = [
     { 
       label: 'Empleados Activos', 
-      value: '248', 
-      change: '+12%', 
+      value: (stats?.overview?.activeEmployees ?? 0).toString(), 
+      change: `${stats?.overview?.totalEmployees ?? 0} total`, 
       icon: Users,
       color: 'text-blue-700',
       bgColor: 'bg-blue-100'
     },
     { 
       label: 'Vehículos Disponibles', 
-      value: '18', 
-      change: '3 en ruta', 
+      value: (stats?.overview?.availableVehicles ?? 0).toString(), 
+      change: `${stats?.overview?.totalVehicles ?? 0} total`, 
       icon: Truck,
       color: 'text-orange-600',
       bgColor: 'bg-orange-100'
     },
     { 
       label: 'Rutas Activas', 
-      value: '6', 
-      change: 'Hoy', 
+      value: (stats?.overview?.activeRoutes ?? 0).toString(), 
+      change: `${stats?.overview?.totalRoutes ?? 0} total`, 
       icon: Route,
       color: 'text-sky-600',
       bgColor: 'bg-sky-100'
+    },
+    { 
+      label: 'Ahorros Mensuales', 
+      value: formatters.currency(stats?.savings?.monthly ?? 0), 
+      change: (stats?.trends?.costReduction ?? '0%') + ' vs mes anterior', 
+      icon: DollarSign,
+      color: 'text-green-600',
+      bgColor: 'bg-green-100'
     },
   ];
 
@@ -46,61 +111,39 @@ export function AdminDashboard() {
     { label: 'Ver Vehículos', icon: Truck, path: '/dashboard/vehiculos', color: 'bg-sky-600 hover:bg-sky-700' },
   ];
 
-  const recentRoutes = [
-    { 
-      id: 'RT-001', 
-      name: 'Ruta Matutina - Sede Norte', 
-      employees: 32, 
-      vehicle: 'Bus Mercedes 001',
-      status: 'Completada',
-      time: '07:30 AM'
-    },
-    { 
-      id: 'RT-002', 
-      name: 'Ruta Vespertina - Sede Sur', 
-      employees: 28, 
-      vehicle: 'Van Toyota 003',
-      status: 'En Progreso',
-      time: '05:45 PM'
-    },
-    { 
-      id: 'RT-003', 
-      name: 'Ruta Matutina - Sede Centro', 
-      employees: 45, 
-      vehicle: 'Bus Volvo 002',
-      status: 'Completada',
-      time: '08:00 AM'
-    },
-    { 
-      id: 'RT-004', 
-      name: 'Ruta Nocturna - Sede Norte', 
-      employees: 18, 
-      vehicle: 'Van Nissan 005',
-      status: 'Programada',
-      time: '10:00 PM'
-    },
-  ];
-
   return (
     <div className="p-6 space-y-6">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {stats.map((stat, i) => {
-          const Icon = stat.icon;
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard Administrativo</h1>
+          <p className="text-gray-600 mt-2">Gestión integral de transporte OptiRoute</p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={() => refetchStats()}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Actualizar
+        </Button>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {overviewCards.map((stat, index) => {
+          const IconComponent = stat.icon;
           return (
-            <Card key={i}>
+            <Card key={index} className="border-l-4 border-l-blue-500 hover:shadow-md transition-shadow">
               <CardContent className="p-6">
-                <div className="flex items-start justify-between">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-                    <p className="text-3xl text-gray-900 mb-1">{stat.value}</p>
-                    <p className="text-sm text-gray-500 flex items-center gap-1">
-                      <TrendingUp className="w-3 h-3" />
-                      {stat.change}
-                    </p>
+                    <p className="text-sm font-medium text-gray-600 mb-2">{stat.label}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
+                    <p className="text-xs text-gray-500 mt-1">{stat.change}</p>
                   </div>
-                  <div className={`w-12 h-12 rounded-lg ${stat.bgColor} flex items-center justify-center`}>
-                    <Icon className={`w-6 h-6 ${stat.color}`} />
+                  <div className={`p-3 rounded-lg ${stat.bgColor}`}>
+                    <IconComponent className={`w-5 h-5 ${stat.color}`} />
                   </div>
                 </div>
               </CardContent>
@@ -137,52 +180,104 @@ export function AdminDashboard() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Rutas Recientes</CardTitle>
-          <Button variant="outline" size="sm">
-            <Calendar className="w-4 h-4 mr-2" />
-            Ver Todas
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/dashboard/rutas">
+              <Calendar className="w-4 h-4 mr-2" />
+              Ver Todas
+            </Link>
           </Button>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {recentRoutes.map((route) => (
-              <div key={route.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <MapPin className="w-6 h-6 text-blue-700" />
-                  </div>
-                  <div>
-                    <p className="text-gray-900">{route.name}</p>
-                    <div className="flex items-center gap-4 mt-1">
-                      <p className="text-sm text-gray-600 flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        {route.employees} empleados
-                      </p>
-                      <p className="text-sm text-gray-600 flex items-center gap-1">
-                        <Truck className="w-3 h-3" />
-                        {route.vehicle}
-                      </p>
-                      <p className="text-sm text-gray-600 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {route.time}
-                      </p>
+            {stats?.recentActivity && stats.recentActivity.length > 0 ? (
+              stats.recentActivity.slice(0, 5).map((activity) => (
+                <div key={activity.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <MapPin className="w-6 h-6 text-blue-700" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{activity.title}</p>
+                      <div className="flex items-center gap-4 mt-1">
+                        <p className="text-sm text-gray-600 flex items-center gap-1">
+                          <Users className="w-3 h-3" />
+                          {activity.description}
+                        </p>
+                        <p className="text-sm text-gray-600 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {formatters.timeAgo(activity.timestamp)}
+                        </p>
+                      </div>
                     </div>
                   </div>
+                  <Badge 
+                    className={getStatusColor(activity.status)}
+                  >
+                    {formatters.activityType(activity.type)}
+                  </Badge>
                 </div>
-                <Badge 
-                  variant={route.status === 'Completada' ? 'secondary' : route.status === 'En Progreso' ? 'default' : 'outline'}
-                  className={
-                    route.status === 'Completada' ? 'bg-green-100 text-green-800' : 
-                    route.status === 'En Progreso' ? 'bg-blue-100 text-blue-800' : 
-                    'bg-gray-100 text-gray-800'
-                  }
-                >
-                  {route.status}
-                </Badge>
+              ))
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                <Route className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p>No hay rutas recientes</p>
+                <Link to="/dashboard/planificar-ruta">
+                  <Button className="mt-4">
+                    Planificar Primera Ruta
+                  </Button>
+                </Link>
               </div>
-            ))}
+            )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Performance Insights */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Eficiencia de Rutas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Distancia promedio optimizada</span>
+                <span className="font-medium">{formatters.distance(stats?.efficiency?.averageOptimizedDistance ?? 0)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Tiempo promedio de ruta</span>
+                <span className="font-medium">{formatters.duration(stats?.efficiency?.averageRouteTime ?? 0)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Puntuación de optimización</span>
+                <span className="font-medium text-green-600">{stats?.efficiency?.optimizationScore ?? 0}%</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Ahorros del Mes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Combustible ahorrado</span>
+                <span className="font-medium text-green-600">{(stats?.savings?.fuelSaved ?? 0).toFixed(1)} gal</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Tiempo ahorrado</span>
+                <span className="font-medium text-green-600">{(stats?.savings?.timeSaved ?? 0)} min</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Total ahorro mensual</span>
+                <span className="font-medium text-green-600">{formatters.currency(stats?.savings?.monthly ?? 0)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
