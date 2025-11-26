@@ -58,18 +58,18 @@ export function GeneratedRoutePage() {
   const openInGoogleMaps = () => {
     // Priorizar stops si están disponibles, sino usar assignments como respaldo
     if (routeData?.stops?.length && routeData.stops.length > 0) {
-      // Usar datos de stops (ubicaciones configurables)
+      // Usar direcciones de stops (ubicaciones configurables)
       const orderedStops = [...routeData.stops].sort((a, b) => a.order - b.order);
       
       const firstStop = orderedStops[0];
-      const origin = encodeURIComponent(`${firstStop.latitude},${firstStop.longitude}`);
+      const origin = encodeURIComponent(firstStop.address);
       
       const lastStop = orderedStops[orderedStops.length - 1];
-      const destination = encodeURIComponent(`${lastStop.latitude},${lastStop.longitude}`);
+      const destination = encodeURIComponent(lastStop.address);
       
       const waypoints = orderedStops
         .slice(1, -1)
-        .map(stop => encodeURIComponent(`${stop.latitude},${stop.longitude}`))
+        .map(stop => encodeURIComponent(stop.address))
         .join('|');
       
       let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
@@ -79,11 +79,21 @@ export function GeneratedRoutePage() {
       
       window.open(url, '_blank');
     } else if (routeData?.assignments?.length && routeData.assignments.length > 0) {
-      // Respaldo: usar assignments (método anterior)
+      // Respaldo: usar direcciones de assignments (método anterior)
       const addresses = routeData.assignments.map(assignment => assignment.employee.address);
+      const origin = encodeURIComponent(addresses[0]); // Primera dirección como origen
       const destination = encodeURIComponent(routeData.homeBase || 'Sede Principal');
-      const waypoints = addresses.map(a => encodeURIComponent(a)).join('|');
-      const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&waypoints=${waypoints}`;
+      
+      // Si hay más de una dirección, las intermedias van como waypoints
+      const waypoints = addresses.length > 1 
+        ? addresses.slice(1).map(address => encodeURIComponent(address)).join('|')
+        : '';
+      
+      let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+      if (waypoints) {
+        url += `&waypoints=${waypoints}`;
+      }
+      
       window.open(url, '_blank');
     } else {
       alert('No hay datos de ruta disponibles para mostrar en Google Maps');
@@ -144,14 +154,14 @@ export function GeneratedRoutePage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          {/* <Button variant="outline">
             <Download className="w-4 h-4 mr-2" />
             Exportar PDF
           </Button>
           <Button variant="outline">
             <FileText className="w-4 h-4 mr-2" />
             Exportar CSV
-          </Button>
+          </Button> */}
           <Button className="bg-blue-700 hover:bg-blue-800">
             <Send className="w-4 h-4 mr-2" />
             Enviar al Conductor

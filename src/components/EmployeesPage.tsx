@@ -116,6 +116,8 @@ export function EmployeesPage() {
       });
     } catch (error) {
       console.error('Error creating employee:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error al crear el empleado';
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -129,6 +131,8 @@ export function EmployeesPage() {
       setEditingEmployee(null);
     } catch (error) {
       console.error('Error updating employee:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error al actualizar el empleado';
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -144,6 +148,8 @@ export function EmployeesPage() {
       await refetchEmployees();
     } catch (error) {
       console.error('Error deleting employee:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error al eliminar el empleado';
+      alert(errorMessage);
     }
   };
 
@@ -228,10 +234,10 @@ export function EmployeesPage() {
           <div className="flex items-center justify-between">
             <CardTitle>Gestión de Empleados</CardTitle>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
+              {/* <Button variant="outline" size="sm">
                 <Download className="w-4 h-4 mr-2" />
                 Exportar
-              </Button>
+              </Button> */}
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" className="bg-blue-700 hover:bg-blue-800">

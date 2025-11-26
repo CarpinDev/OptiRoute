@@ -4,7 +4,6 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Users, Truck, TrendingDown, Clock, Shield, AlertCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { Alert, AlertDescription } from './ui/alert';
@@ -12,7 +11,6 @@ import { Alert, AlertDescription } from './ui/alert';
 export function LoginPage() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [activeTab, setActiveTab] = useState('admin');
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -26,16 +24,7 @@ export function LoginPage() {
   };
 
   const getDefaultCredentials = () => {
-    switch (activeTab) {
-      case 'admin':
-        return { email: 'admin@optiroute.com', password: 'admin123' };
-      case 'driver':
-        return { email: 'driver@optiroute.com', password: 'driver123' };
-      case 'employee':
-        return { email: 'empleado@optiroute.com', password: 'employee123' };
-      default:
-        return { email: '', password: '' };
-    }
+    return { email: 'admin@optiroute.com', password: 'admin123' };
   };
 
   const fillDefaultCredentials = () => {
@@ -57,22 +46,7 @@ export function LoginPage() {
       const response = await login(formData.email, formData.password);
       
       if (response.success) {
-        const userRole = response.user.role;
-        
-        // Redirect based on user role
-        switch (userRole) {
-          case 'admin':
-            navigate('/dashboard');
-            break;
-          case 'driver':
-            navigate('/conductor');
-            break;
-          case 'employee':
-            navigate('/empleado');
-            break;
-          default:
-            navigate('/dashboard');
-        }
+        navigate('/dashboard');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error de autenticación');
@@ -93,7 +67,7 @@ export function LoginPage() {
               <p className="text-xs text-gray-600">Sistema de Gestión de Rutas</p>
             </div>
           </div>
-          <Button variant="outline">Soporte</Button>
+          {/* <Button variant="outline">Soporte</Button> */}
         </div>
       </header>
 
@@ -164,26 +138,15 @@ export function LoginPage() {
           <Card className="shadow-xl">
             <CardHeader>
               <CardTitle>Iniciar Sesión</CardTitle>
-              <CardDescription>Selecciona tu tipo de usuario</CardDescription>
+              <CardDescription>Acceso al panel de administración</CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="admin">
-                    <Shield className="w-4 h-4 mr-2" />
-                    Admin
-                  </TabsTrigger>
-                  <TabsTrigger value="driver">
-                    <Truck className="w-4 h-4 mr-2" />
-                    Conductor
-                  </TabsTrigger>
-                  <TabsTrigger value="employee">
-                    <Users className="w-4 h-4 mr-2" />
-                    Empleado
-                  </TabsTrigger>
-                </TabsList>
-
-                <div className="mt-4">
+              <div className="mb-4 flex items-center gap-2 text-blue-900">
+                <Shield className="w-5 h-5" />
+                <span className="font-medium">Acceso de Administrador</span>
+              </div>
+              
+              <div>
                   {error && (
                     <Alert className="mb-4 border-red-200 bg-red-50">
                       <AlertCircle className="h-4 w-4 text-red-600" />
@@ -245,7 +208,6 @@ export function LoginPage() {
                     </Button>
                   </form>
                 </div>
-              </Tabs>
             </CardContent>
           </Card>
         </div>

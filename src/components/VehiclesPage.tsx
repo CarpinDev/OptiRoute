@@ -102,6 +102,8 @@ export function VehiclesPage() {
       });
     } catch (error) {
       console.error('Error creating vehicle:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error al crear el vehículo';
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -115,6 +117,8 @@ export function VehiclesPage() {
       setEditingVehicle(null);
     } catch (error) {
       console.error('Error updating vehicle:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error al actualizar el vehículo';
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -130,6 +134,8 @@ export function VehiclesPage() {
       await refetchVehicles();
     } catch (error) {
       console.error('Error deleting vehicle:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Error al eliminar el vehículo';
+      alert(errorMessage);
     }
   };
 
@@ -261,10 +267,10 @@ export function VehiclesPage() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <CardTitle>Lista de Vehículos</CardTitle>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
+              {/* <Button variant="outline" size="sm">
                 <Download className="w-4 h-4 mr-2" />
                 Exportar
-              </Button>
+              </Button> */}
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" className="bg-blue-700 hover:bg-blue-800">

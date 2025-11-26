@@ -1,4 +1,5 @@
-const API_URL = 'http://localhost:3001/api';
+// const API_URL = 'http://localhost:4300/api';
+const API_URL = 'https://q7xkzgcw-4300.use.devtunnels.ms/api';
 
 export interface Location {
   id: number;

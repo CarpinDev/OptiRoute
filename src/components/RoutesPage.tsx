@@ -103,7 +103,9 @@ export function RoutesPage() {
       await refetchRoutes();
     } catch (error) {
       console.error('Error updating route status:', error);
-      alert('Error al actualizar el estado de la ruta');
+      // Mostrar el mensaje específico del backend
+      const errorMessage = error instanceof Error ? error.message : 'Error al actualizar el estado de la ruta';
+      alert(errorMessage);
     }
   };
 
@@ -117,7 +119,9 @@ export function RoutesPage() {
       await refetchRoutes();
     } catch (error) {
       console.error('Error deleting route:', error);
-      alert('Error al eliminar la ruta');
+      // Mostrar el mensaje específico del backend
+      const errorMessage = error instanceof Error ? error.message : 'Error al eliminar la ruta';
+      alert(errorMessage);
     }
   };
 
@@ -245,10 +249,10 @@ export function RoutesPage() {
           <div className="flex items-center justify-between">
             <CardTitle>Gestión de Rutas</CardTitle>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
+              {/* <Button variant="outline" size="sm">
                 <Download className="w-4 h-4 mr-2" />
                 Exportar
-              </Button>
+              </Button> */}
               <Button 
                 size="sm" 
                 className="bg-blue-700 hover:bg-blue-800"

@@ -109,7 +109,8 @@ export function PlanRoutePage() {
       setOptimizedRoute(result);
     } catch (error) {
       console.error('Error optimizing route:', error);
-      alert('Error al optimizar la ruta. Intenta de nuevo.');
+      const errorMessage = error instanceof Error ? error.message : 'Error al optimizar la ruta. Intenta de nuevo.';
+      alert(errorMessage);
     } finally {
       setIsOptimizing(false);
     }
@@ -127,7 +128,8 @@ export function PlanRoutePage() {
       navigate('/dashboard/ruta-generada', { state: { route: optimizedRoute } });
     } catch (error) {
       console.error('Error:', error);
-      alert('Error al procesar la ruta. Intenta de nuevo.');
+      const errorMessage = error instanceof Error ? error.message : 'Error al procesar la ruta. Intenta de nuevo.';
+      alert(errorMessage);
     }
   };
 
